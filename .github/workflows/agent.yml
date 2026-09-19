@@ -26,6 +26,15 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@v3
+        with:
+          # Explicit packages: sdkmanager on current command-line tools (16.0) no longer has a
+          # "tools" package (setup-android@v3's default install list) — it's obsolete and errors
+          # out before Gradle even runs. android-35/build-tools 35.0.0 match every module's
+          # compileSdk = 35.
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
       - uses: gradle/actions/setup-gradle@v4
         with:
           # Installs this Gradle and puts `gradle` on PATH, so we don't need a
