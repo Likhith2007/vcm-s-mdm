@@ -168,7 +168,10 @@ d=json.load(sys.stdin)
 def asset(n): return next((a["browser_download_url"] for a in d.get("assets",[]) if a["name"]==n),"")
 print({"apk":asset("mdmesh-agent.apk"),"manifest":asset("manifest.json")}.get(sys.argv[1],""))' "$1" 2>/dev/null; }
   REL=$(curl -fsSL "${AUTH[@]}" "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" 2>/dev/null || true)
-  APK_URL=$(printf '%s' "$REL" | jget apk); MAN_URL=$(printf '%s' "$REL" | jget manifest)
+  # jget exits non-zero on invalid/empty JSON (e.g. no release published yet, so $REL is empty) —
+  # under `set -o pipefail`+`set -e` that would silently abort the whole wizard right here, so each
+  # assignment is guarded the same way the manifest-parsing calls below already are.
+  APK_URL=$(printf '%s' "$REL" | jget apk || true); MAN_URL=$(printf '%s' "$REL" | jget manifest || true)
   if [ -n "$APK_URL" ] && [ -n "$MAN_URL" ]; then
     MAN=$(curl -fsSL "${AUTH[@]}" "$MAN_URL" 2>/dev/null || true)
     AGENT_CK=$(printf '%s' "$MAN" | python3 -c 'import sys,json;print(json.load(sys.stdin)["components"]["apk"]["signatureChecksum"])' 2>/dev/null || true)
