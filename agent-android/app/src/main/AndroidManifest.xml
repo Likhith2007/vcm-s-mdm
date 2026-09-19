@@ -11,6 +11,10 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Used only for QR-code enrollment scanning (MainActivity's "Scan enrollment QR"); token-based
+         enrollment needs no camera at all, so this is non-required — the app must still install and
+         run (including on a Chrome OS / camera-less device) with QR scanning simply unavailable. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <!-- Minimal permission set. -->
     <uses-permission android:name="android.permission.INTERNET" />
