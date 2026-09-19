@@ -1,0 +1,60 @@
+/*
+ *
+ * Headwind MDM: Open Source Android MDM Software
+ * https://h-mdm.com
+ *
+ * Copyright (C) 2019 Headwind Solutions LLC (http://h-sms.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+package com.hmdm.persistence.mapper;
+
+import com.hmdm.persistence.domain.AgentEnrollmentToken;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.SelectKey;
+import org.apache.ibatis.annotations.Update;
+
+/**
+ * <p>MyBatis mapper for {@link AgentEnrollmentToken} (agent v1 single-use enrollment tokens).</p>
+ */
+public interface AgentEnrollmentTokenMapper {
+
+    @Insert({"INSERT INTO agentEnrollmentToken (token, customerId, used, createdAt, expiresAt, configurationId) " +
+            "VALUES (#{token}, #{customerId}, #{used}, #{createdAt}, #{expiresAt}, #{configurationId})"})
+    @SelectKey(statement = "SELECT currval('agentenrollmenttoken_id_seq')", keyColumn = "id", keyProperty = "id",
+            before = false, resultType = int.class)
+    void insert(AgentEnrollmentToken token);
+
+    @Select({"SELECT * FROM agentEnrollmentToken WHERE token = #{token}"})
+    AgentEnrollmentToken findByToken(@Param("token") String token);
+
+    /**
+     * Atomically claim the single-use token: exactly one concurrent enroll gets rowcount 1; the
+     * rest get 0 (already used, or expired between the pre-check and here). This is the guard that
+     * keeps N concurrent enrolls with one token from creating N device rows.
+     */
+    @Update({"UPDATE agentEnrollmentToken SET used = true " +
+            "WHERE id = #{id} AND used = false AND (expiresAt IS NULL OR expiresAt > #{now})"})
+    int claim(@Param("id") Integer id, @Param("now") long now);
+
+    /**
+     * Release a claimed token after a SERVER-side enrollment failure (device creation rejected),
+     * so a fixable condition doesn't permanently burn the token.
+     */
+    @Update({"UPDATE agentEnrollmentToken SET used = false WHERE id = #{id}"})
+    void release(@Param("id") Integer id);
+}

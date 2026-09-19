@@ -1,0 +1,54 @@
+# Dev environment for the control plane (Postgres + Tomcat server).
+# A lightweight dev stack; for a real host install use ./setup.sh (Docker) or ./setup.sh --native.
+# Usage and the post-start seeding step are documented in docs/DEV.md.
+
+services:
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: mdmesh
+      POSTGRES_USER: mdmesh
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mdmesh}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # SQL seed scripts mounted read-only; run manually AFTER first startup
+      # (they UPDATE rows Liquibase creates at app boot — not an initdb script).
+      - ./install/sql:/sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mdmesh -d mdmesh"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  server:
+    build:
+      context: .
+      dockerfile: docker/server.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-mdmesh}
+      DB_USER: ${DB_USER:-mdmesh}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      BASE_URL: ${BASE_URL:?Set BASE_URL in .env}
+      HASH_SECRET: ${HASH_SECRET:?Set HASH_SECRET in .env}
+      SECURE_ENROLLMENT: ${SECURE_ENROLLMENT:-0}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-25}
+      SMTP_FROM: ${SMTP_FROM:-mdm@localhost}
+      # Group Policies' time-window schedules (GroupPolicyScheduler) evaluate against the JVM's
+      # local time-of-day — without this the container defaults to UTC, so "10 PM" in the console
+      # would silently mean 10 PM UTC instead of the admin's actual local time.
+      TZ: ${TZ:-Asia/Kolkata}
+    ports:
+      - "8080:8080"
+    # 31000 is the embedded MQTT broker; expose if you want devices to reach it directly.
+    # - "31000:31000"
+
+volumes:
+  pgdata:
