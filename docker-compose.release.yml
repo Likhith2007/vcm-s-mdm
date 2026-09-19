@@ -62,7 +62,8 @@ services:
   supervisor:
     image: ghcr.io/${IMAGE_OWNER:-mdmesh-app}/mdmesh-supervisor:${SUPERVISOR_VERSION:-latest}
     restart: unless-stopped
-    working_dir: /project
+    # NOT working_dir: /project — see docker-compose.yml's supervisor service for why (breaks
+    # `CMD ["node","server.js"]`, which resolves against the image's own WORKDIR /app).
     environment:
       GITHUB_REPO: ${GITHUB_REPO:-}
       UPDATE_CHANNEL: ${UPDATE_CHANNEL:-stable}

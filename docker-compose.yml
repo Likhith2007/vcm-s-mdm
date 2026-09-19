@@ -87,7 +87,12 @@ services:
       context: .
       dockerfile: docker/supervisor.Dockerfile
     restart: unless-stopped
-    working_dir: /project
+    # NOT working_dir: /project — the image's own WORKDIR (/app, from supervisor.Dockerfile) is where
+    # `CMD ["node","server.js"]` actually resolves; overriding it here made `node server.js` fail with
+    # MODULE_NOT_FOUND (looking for /project/server.js, which never exists — server.js lives in the
+    # image at /app/server.js). server.js already spawns its own `docker compose` children with an
+    # explicit cwd of /project (COMPOSE_PROJECT_DIR, see supervisor/server.js), so the mounted repo at
+    # /project is only ever needed there, never as the container's own default working directory.
     environment:
       GITHUB_REPO: ${GITHUB_REPO:-}
       UPDATE_CHANNEL: ${UPDATE_CHANNEL:-stable}
