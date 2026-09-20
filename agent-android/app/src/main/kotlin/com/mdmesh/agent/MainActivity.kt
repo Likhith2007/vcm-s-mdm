@@ -65,8 +65,26 @@ class MainActivity : ComponentActivity() {
         handleScannedEnrollment(raw)
     }
 
+    private val deviceOwnerProvisioning = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            showEnrollmentResult(true, "Full management enabled — this device is now Device Owner.")
+        } else {
+            showEnrollmentResult(
+                false,
+                "Couldn't enable full management. This almost always means the phone still has an " +
+                    "account on it (Google or otherwise) — remove every account under Settings > " +
+                    "Accounts, then try again.",
+            )
+        }
+        refresh()
+    }
+
     private lateinit var deviceIdValue: TextView
     private lateinit var kioskValue: TextView
+    private lateinit var managementValue: TextView
+    private lateinit var manageButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -132,6 +150,10 @@ class MainActivity : ComponentActivity() {
 
     private fun refresh() {
         kioskValue.text = if (isLocked()) "Locked (kiosk active)" else "Not locked"
+        val owner = isDeviceOwner()
+        managementValue.text = if (owner) "Device Owner — active" else "Not managed"
+        managementValue.setTextColor(if (owner) OK else ALERT)
+        manageButton.visibility = if (owner) android.view.View.GONE else android.view.View.VISIBLE
         lifecycleScope.launch {
             val id = deviceIdStore.current()
             deviceIdValue.text = if (id.isNullOrBlank()) enrollingLabel() else id
@@ -153,6 +175,29 @@ class MainActivity : ComponentActivity() {
     private fun isDeviceOwner(): Boolean =
         dpmHandle.dpm.isDeviceOwnerApp(packageName)
 
+    /**
+     * Self-service Device Owner grant — an alternative to the fragile "tap the Welcome screen 6
+     * times" QR-during-setup flow (not every OEM/build surfaces it the same way) and to running
+     * `adb shell dpm set-device-owner` by hand. [DevicePolicyManager.ACTION_PROVISION_MANAGED_DEVICE]
+     * is a normal system intent any installed app can fire; the OS does its own account check
+     * (this device must have none) and runs the exact same [GetProvisioningModeActivity] /
+     * [AdminPolicyComplianceActivity] flow QR provisioning does. No admin-extras bundle is passed
+     * here — this device is already enrolled with the server, so there's nothing new to persist.
+     */
+    private fun startDeviceOwnerProvisioning() {
+        val intent = Intent(DevicePolicyManager.ACTION_PROVISION_MANAGED_DEVICE).apply {
+            putExtra(
+                DevicePolicyManager.EXTRA_PROVISIONING_DEVICE_ADMIN_COMPONENT_NAME,
+                AdminReceiver.componentName(this@MainActivity),
+            )
+        }
+        if (intent.resolveActivity(packageManager) == null) {
+            showEnrollmentResult(false, "This device doesn't support Device Owner provisioning.")
+            return
+        }
+        deviceOwnerProvisioning.launch(intent)
+    }
+
     private fun buildUi(): ScrollView {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -164,13 +209,13 @@ class MainActivity : ComponentActivity() {
         root.addView(text("Device agent", 14f, MUTED).apply { setPadding(0, dp(2), 0, dp(20)) })
 
         root.addView(label("MANAGEMENT"))
-        root.addView(
-            text(
-                if (isDeviceOwner()) "Device Owner — active" else "Not managed",
-                16f,
-                if (isDeviceOwner()) OK else ALERT,
-            ),
-        )
+        managementValue = text("…", 16f, TEXT)
+        root.addView(managementValue)
+        manageButton = Button(this).apply {
+            text = "Enable full management"
+            setOnClickListener { startDeviceOwnerProvisioning() }
+        }
+        root.addView(manageButton)
         root.addView(spacer())
 
         root.addView(label("DEVICE ID"))
