@@ -58,6 +58,14 @@ public class AgentWakeHub {
             try { previous.close(); } catch (Exception ignored) { }
         }
         log.debug("Agent wake socket registered for {}", deviceNumber);
+        // A command queued while this device's socket was down (or not yet opened) got no wake —
+        // wake() is a no-op when nobody's listening, and nothing re-sends it once the socket comes
+        // back. Without this, that command just sits until the next periodic check-in (up to the
+        // WorkManager floor), even though the device is live again right now. Reconnect is exactly
+        // the moment to flush it.
+        if (!commandDAO.listPending(deviceNumber).isEmpty()) {
+            wake(deviceNumber, "commands");
+        }
     }
 
     public void unregister(String deviceNumber, Session session) {
