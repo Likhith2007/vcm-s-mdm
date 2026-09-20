@@ -26,6 +26,15 @@
 		reverse_proxy server:8080
 	}
 
+	# Ad-hoc static files (e.g. a debug enrollment APK) from the static_files volume — for a
+	# deployment with no signed GitHub release yet, so /files/agent.apk (the supervisor's verified
+	# mirror) has nothing to serve. Not auth-gated: treat anything placed here as public, same as
+	# the SPA itself.
+	handle_path /static/* {
+		root * /static
+		file_server
+	}
+
 	# Updater status + recovery page → the decoupled supervisor (always up, independent of the
 	# server), so "update available" + recovery stay reachable even mid-update.
 	handle /update/* {

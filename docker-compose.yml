@@ -75,6 +75,12 @@ services:
     volumes:
       - caddy_data:/data
       - caddy_config:/config
+      # Ad-hoc APK hosting for deployments with no signed GitHub release yet (setup.sh's release
+      # check then leaves VITE_AGENT_APK_URL unset, so /files/agent.apk 404s via the supervisor
+      # mirror): an admin can drop a debug/unsigned APK here and point VITE_AGENT_APK_URL at it in
+      # .env, and it survives `--build` since it's a separate volume, not baked into the image's
+      # /srv. See docker/Caddyfile's /static/* route.
+      - static_files:/static
 
   # Decoupled updater/recovery service. Polls GitHub for new releases, verifies the signed manifest,
   # exposes /update/status, serves /recovery, and (Phase 4) applies updates by driving compose against
@@ -128,4 +134,5 @@ volumes:
   mdmeshdata:
   caddy_data:
   caddy_config:
+  static_files:   # ad-hoc files caddy serves under /static/* (e.g. a debug enrollment APK)
   backups:   # supervisor pre-update DB dumps + version snapshots + auto.json (survives recreate)
