@@ -17,7 +17,6 @@ import com.mdmesh.core.command.handlers.AppIconsHandler
 import com.mdmesh.core.command.handlers.AppInstallHandler
 import com.mdmesh.core.command.handlers.AppScanHandler
 import com.mdmesh.core.command.handlers.AppUninstallHandler
-import com.mdmesh.core.command.handlers.ComplexPolicyHandler
 import com.mdmesh.core.command.handlers.ConfigSyncHandler
 import com.mdmesh.core.command.handlers.DeviceAlertHandler
 import com.mdmesh.core.command.handlers.DeviceLockHandler
@@ -201,17 +200,14 @@ object AgentModule {
     @IntoSet
     fun provideConfigSyncHandler(): CommandHandler = ConfigSyncHandler()
 
+    // A single handler for BOTH toggle and complex policies — see PolicyApplyHandler's kdoc for
+    // why this must never be split into two @IntoSet providers sharing type = "policy.apply".
     @Provides
     @IntoSet
     fun providePolicyApplyHandler(
         toggles: Map<String, @JvmSuppressWildcards TogglePolicy>,
-    ): CommandHandler = PolicyApplyHandler(toggles)
-
-    @Provides
-    @IntoSet
-    fun provideComplexPolicyHandler(
         complexPolicies: Map<String, @JvmSuppressWildcards ComplexPolicy>,
-    ): CommandHandler = ComplexPolicyHandler(complexPolicies)
+    ): CommandHandler = PolicyApplyHandler(toggles, complexPolicies)
 
     @Provides
     @Singleton
