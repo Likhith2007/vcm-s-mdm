@@ -39,14 +39,14 @@ export function TelemetryCard({ device }: { device: Device }) {
 
   if (!t) {
     return (
-      <div className="panel">
+      <div className="panel panel-embedded">
         <h2 className="panel-title">Telemetry</h2>
         <p className="muted">No telemetry yet.</p>
       </div>
     );
   }
   return (
-    <div className="panel">
+    <div className="panel panel-embedded">
       <h2 className="panel-title">Telemetry</h2>
       <Group title="Hardware" data={t.hardware} />
       <Group title="Network & Battery" data={t.dynamic} />

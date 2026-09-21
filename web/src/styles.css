@@ -1000,10 +1000,13 @@ a {
   background: transparent;
   box-shadow: none;
 }
-.tabbody > .panel > .panel-head, /* ActionConsole "Device control" + Sync */
-.tabbody > .panel > .panel-title, /* Telemetry / Events section heading */
-.tabbody > .panel > .state-grid {
-  /* ActionConsole live state — duplicated by the rail Status group */
+/* Opt-in only (.panel-embedded): ActionConsole's "Device control" + Sync, the Telemetry/Events
+   section heading, and ActionConsole's live-state grid duplicate what the rail + tab strip already
+   show. Apps/Location panels have their own non-duplicated header (Scan now / Refresh) and must
+   keep it — a blanket `.tabbody > .panel > .panel-head` selector here previously hid those too. */
+.tabbody > .panel.panel-embedded > .panel-head,
+.tabbody > .panel.panel-embedded > .panel-title,
+.tabbody > .panel.panel-embedded > .state-grid {
   display: none;
 }
 

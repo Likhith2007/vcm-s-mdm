@@ -91,7 +91,7 @@ export function ActionConsole({ device }: { device: Device }) {
     : true;
 
   return (
-    <div className="panel">
+    <div className="panel panel-embedded">
       <div className="panel-head">
         <h2 className="panel-title">Device control</h2>
         <button

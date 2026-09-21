@@ -32,7 +32,7 @@ export function EventTimeline({ device }: { device: Device }) {
   }, [device.number]);
 
   return (
-    <div className="panel">
+    <div className="panel panel-embedded">
       <h2 className="panel-title">Events</h2>
       {events.length === 0 ? (
         <p className="muted">No events yet.</p>
