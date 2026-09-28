@@ -8,12 +8,18 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * App blocking strategy for API 24+.
- * Uses [android.app.admin.DevicePolicyManager.setApplicationHidden] to hide/block apps.
+ * Uses [android.app.admin.DevicePolicyManager.setApplicationHidden] to hide/block apps, falling
+ * back to [android.app.admin.DevicePolicyManager.setPackagesSuspended] when the OS refuses to
+ * hide a package — some OEMs protect their own bundled system apps (an app store, dialer, etc.)
+ * from being hidden even by the active Device Owner, but still allow suspending them (a separate
+ * enforcement: the app stays visible/installed but can't be opened — tapping it shows a system
+ * "this app is suspended" dialog instead). Trying both and succeeding if either works maximizes
+ * how many packages this can actually block, which is the whole point of "block any app".
  *
  * Payload expected: `{ "policy": "appBlock", "packageName": "com.example.x", "value": true/false }`
  *
- * `value=true` → hide app (block)
- * `value=false` → unhide app (allow)
+ * `value=true` → hide/suspend app (block)
+ * `value=false` → unhide/unsuspend app (allow)
  */
 internal class AppBlockHidePolicy(
     private val handle: DpmHandle,
@@ -38,14 +44,19 @@ internal class AppBlockHidePolicy(
         if (!block) {
             selfInitiatedTracker.markSelfInitiated(packageName)
         }
-        // value=true => block (hide); value=false => allow (unhide). setApplicationHidden
-        // returns false (not an exception) when the OS refuses -- e.g. some OEMs protect their
-        // own bundled system apps (an app store, dialer, etc.) from being hidden even by the
-        // Device Owner. Ignoring that return value previously reported "done" unconditionally,
-        // so a silently-refused block looked identical to a real one from the console's side.
-        val applied = handle.dpm.setApplicationHidden(handle.admin, packageName, block)
-        if (!applied) {
-            return PolicyOutcome.Failed("setApplicationHidden refused for $packageName (protected system app?)")
+
+        // Both return value(s), not exceptions, when the OS refuses -- neither can be assumed to
+        // succeed. Try both; either one actually blocking the app is a win.
+        val hidden = handle.dpm.setApplicationHidden(handle.admin, packageName, block)
+        val notSuspended = runCatching {
+            handle.dpm.setPackagesSuspended(handle.admin, arrayOf(packageName), block)
+        }.getOrElse { arrayOf(packageName) } // treat a thrown exception as "failed to suspend"
+        val suspended = packageName !in notSuspended
+
+        if (!hidden && !suspended) {
+            return PolicyOutcome.Failed(
+                "Both hide and suspend refused for $packageName (protected system app?)",
+            )
         }
         PolicyOutcome.Applied
     }.getOrElse { PolicyOutcome.Failed(it.message ?: "appBlock apply failed") }
