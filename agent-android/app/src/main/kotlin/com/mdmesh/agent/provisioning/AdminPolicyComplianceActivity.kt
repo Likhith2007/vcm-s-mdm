@@ -61,7 +61,7 @@ class AdminPolicyComplianceActivity : Activity() {
     private fun applyBaselinePolicy(ctx: android.content.Context) {
         runCatching {
             val dpm = ctx.getSystemService(android.content.Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-            val handle = DpmHandle(dpm, AdminReceiver.componentName(ctx))
+            val handle = DpmHandle(dpm, AdminReceiver.componentName(ctx), ctx)
             PolicyManager(handle).setPermissionAutoGrant()
             // Provision the DO reset-password token once, so device.passcodeReset works later.
             ResetPasswordTokenStore(ctx, handle).ensureToken()

@@ -15,6 +15,8 @@ import com.mdmesh.policy.security.AdminRemovalPolicy
 import com.mdmesh.policy.security.AdminRemovalPolicyFactory
 import com.mdmesh.policy.security.FactoryResetPolicy
 import com.mdmesh.policy.security.FactoryResetPolicyFactory
+import com.mdmesh.policy.security.PreventUninstallPolicy
+import com.mdmesh.policy.security.PreventUninstallPolicyFactory
 import com.mdmesh.policy.security.UnknownSourcesPolicy
 import com.mdmesh.policy.security.UnknownSourcesPolicyFactory
 import com.mdmesh.policy.security.UsbDebugPolicy
@@ -61,6 +63,7 @@ class CapabilityRegistry(
         FactoryResetPolicyFactory.create(handle)?.let { put(FactoryResetPolicy.CAPABILITY_KEY, it) }
         UnknownSourcesPolicyFactory.create(handle)?.let { put(UnknownSourcesPolicy.CAPABILITY_KEY, it) }
         AdminRemovalPolicyFactory.create(handle)?.let { put(AdminRemovalPolicy.CAPABILITY_KEY, it) }
+        PreventUninstallPolicyFactory.create(handle)?.let { put(PreventUninstallPolicy.CAPABILITY_KEY, it) }
         // Each factory probe returns null on an unsupported device, so a key only
         // appears here when a usable strategy exists.
         // Absence == "not advertised" == "never commanded".

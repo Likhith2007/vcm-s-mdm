@@ -259,6 +259,22 @@ export const ACTION_TEMPLATES: CommandTemplateExt[] = [
     },
   },
   {
+    key: 'prevent-uninstall-on', label: 'Prevent uninstalling apps', group: 'safe',
+    description: 'Block the device user from uninstalling any app — existing installs and anything installed afterward.',
+    request: {
+      type: 'policy.apply', requiresCapability: 'policy.preventUninstall',
+      payload: JSON.stringify({ policy: 'preventUninstall', value: true }),
+    },
+  },
+  {
+    key: 'prevent-uninstall-off', label: 'Allow uninstalling apps', group: 'safe',
+    description: 'Release the uninstall-blocked restriction across all apps.',
+    request: {
+      type: 'policy.apply', requiresCapability: 'policy.preventUninstall',
+      payload: JSON.stringify({ policy: 'preventUninstall', value: false }),
+    },
+  },
+  {
     // Handled specially by ActionConsole: opens the app-picker modal (scans the device, builds the
     // KioskApplyPayload, queues kiosk.enter ungated). Listed here only for the button + grouping.
     key: 'kiosk-enter', label: 'Enter kiosk', group: 'disruptive', danger: true,

@@ -7,6 +7,8 @@ import android.util.Log
 import com.mdmesh.core.install.PendingInstallGate
 import com.mdmesh.core.sync.CheckInWorker
 import com.mdmesh.core.telemetry.EventLog
+import com.mdmesh.policy.security.PreventUninstallPolicy
+import com.mdmesh.policy.wifi.DpmHandle
 import com.mdmesh.proto.EventType
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +35,7 @@ class PackageEventReceiver : BroadcastReceiver() {
 
     @Inject lateinit var eventLog: EventLog
     @Inject lateinit var gate: PendingInstallGate
+    @Inject lateinit var dpmHandle: DpmHandle
 
     override fun onReceive(context: Context, intent: Intent) {
         val pkg = intent.data?.schemeSpecificPart ?: return
@@ -45,6 +48,13 @@ class PackageEventReceiver : BroadcastReceiver() {
                 val pending = goAsync()
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
+                        // A newly-installed package starts out uninstallable-by-user by default —
+                        // if the admin currently has "prevent uninstall" active, a fresh install
+                        // must inherit that restriction too, not just whatever was installed at
+                        // the moment the toggle was switched on.
+                        if (PreventUninstallPolicy.isCurrentlyEnabled(dpmHandle)) {
+                            runCatching { dpmHandle.dpm.setUninstallBlocked(dpmHandle.admin, pkg, true) }
+                        }
                         gate.handleDetectedInstall(pkg)
                         CheckInWorker.scheduleNow(context)
                     } catch (e: Exception) {

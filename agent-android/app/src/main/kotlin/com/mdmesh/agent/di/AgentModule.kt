@@ -92,7 +92,7 @@ object AgentModule {
     @Singleton
     fun provideDpmHandle(@ApplicationContext context: Context): DpmHandle {
         val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        return DpmHandle(dpm = dpm, admin = AdminReceiver.componentName(context))
+        return DpmHandle(dpm = dpm, admin = AdminReceiver.componentName(context), context = context)
     }
 
     @Provides
