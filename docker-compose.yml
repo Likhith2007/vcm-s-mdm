@@ -43,6 +43,11 @@ services:
       BASE_URL: ${BASE_URL:?set BASE_URL in .env}
       HASH_SECRET: ${HASH_SECRET:?set HASH_SECRET in .env}
       SECURE_ENROLLMENT: ${SECURE_ENROLLMENT:-0}
+      # Group Policies' time-window schedules (GroupPolicyScheduler) evaluate against the JVM's
+      # local time-of-day -- a container defaults to UTC, so an admin typing "22:00–06:00" meaning
+      # their own local hours gets a window silently evaluated in UTC instead, off by their offset
+      # from UTC. Override in .env if the admin isn't in IST.
+      TZ: ${TZ:-Asia/Kolkata}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-25}
       SMTP_FROM: ${SMTP_FROM:-mdm@localhost}

@@ -38,6 +38,9 @@ services:
       BASE_URL: ${BASE_URL:?set BASE_URL in .env}
       HASH_SECRET: ${HASH_SECRET:?set HASH_SECRET in .env}
       SECURE_ENROLLMENT: ${SECURE_ENROLLMENT:-0}
+      # See docker-compose.yml's server service for why this matters (Group Policies' time-window
+      # scheduler evaluates against the JVM's local time-of-day, which defaults to UTC otherwise).
+      TZ: ${TZ:-Asia/Kolkata}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-25}
       SMTP_FROM: ${SMTP_FROM:-mdm@localhost}
