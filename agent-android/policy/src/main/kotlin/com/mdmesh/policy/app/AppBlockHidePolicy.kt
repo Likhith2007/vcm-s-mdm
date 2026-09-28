@@ -38,8 +38,15 @@ internal class AppBlockHidePolicy(
         if (!block) {
             selfInitiatedTracker.markSelfInitiated(packageName)
         }
-        // value=true => block (hide); value=false => allow (unhide).
-        handle.dpm.setApplicationHidden(handle.admin, packageName, block)
+        // value=true => block (hide); value=false => allow (unhide). setApplicationHidden
+        // returns false (not an exception) when the OS refuses -- e.g. some OEMs protect their
+        // own bundled system apps (an app store, dialer, etc.) from being hidden even by the
+        // Device Owner. Ignoring that return value previously reported "done" unconditionally,
+        // so a silently-refused block looked identical to a real one from the console's side.
+        val applied = handle.dpm.setApplicationHidden(handle.admin, packageName, block)
+        if (!applied) {
+            return PolicyOutcome.Failed("setApplicationHidden refused for $packageName (protected system app?)")
+        }
         PolicyOutcome.Applied
     }.getOrElse { PolicyOutcome.Failed(it.message ?: "appBlock apply failed") }
 }

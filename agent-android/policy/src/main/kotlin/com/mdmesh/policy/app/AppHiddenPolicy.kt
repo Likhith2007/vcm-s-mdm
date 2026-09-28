@@ -38,8 +38,13 @@ internal class AppHiddenPolicy(
         if (!hide) {
             selfInitiatedTracker.markSelfInitiated(packageName)
         }
-        // value=true => hide; value=false => show.
-        handle.dpm.setApplicationHidden(handle.admin, packageName, hide)
+        // value=true => hide; value=false => show. setApplicationHidden returns false (not an
+        // exception) when the OS refuses -- see AppBlockHidePolicy's identical fix for why this
+        // return value must be checked rather than assumed true.
+        val applied = handle.dpm.setApplicationHidden(handle.admin, packageName, hide)
+        if (!applied) {
+            return PolicyOutcome.Failed("setApplicationHidden refused for $packageName (protected system app?)")
+        }
         PolicyOutcome.Applied
     }.getOrElse { PolicyOutcome.Failed(it.message ?: "appHide apply failed") }
 }
