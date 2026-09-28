@@ -9,6 +9,7 @@ import com.hmdm.rest.json.GroupPolicyRequest;
 import com.hmdm.rest.json.GroupPolicyView;
 import com.hmdm.rest.json.Response;
 import com.hmdm.security.SecurityContext;
+import com.hmdm.task.GroupPolicyScheduler;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.slf4j.Logger;
@@ -44,15 +45,17 @@ public class GroupPolicyResource {
 
     private GroupDAO groupDAO;
     private GroupPolicyDAO groupPolicyDAO;
+    private GroupPolicyScheduler scheduler;
 
     /** A constructor required by Swagger. */
     public GroupPolicyResource() {
     }
 
     @Inject
-    public GroupPolicyResource(GroupDAO groupDAO, GroupPolicyDAO groupPolicyDAO) {
+    public GroupPolicyResource(GroupDAO groupDAO, GroupPolicyDAO groupPolicyDAO, GroupPolicyScheduler scheduler) {
         this.groupDAO = groupDAO;
         this.groupPolicyDAO = groupPolicyDAO;
+        this.scheduler = scheduler;
     }
 
     // =================================================================================================================
@@ -114,6 +117,13 @@ public class GroupPolicyResource {
             groupId = group.getId();
         }
 
+        // Captured before the upsert overwrites it — reconcileNow needs the OLD package list to
+        // know which packages were just removed (those must be explicitly unblocked; they won't
+        // be in the "current" list to iterate over once the new policy row is in place).
+        GroupPolicy existingPolicy = groupPolicyDAO.findByGroupId(groupId);
+        List<String> previousPackages = existingPolicy != null
+                ? readPackages(existingPolicy.getPackages()) : Collections.emptyList();
+
         String policyType = GroupPolicy.TYPE_BLOCK_SCHEDULED.equals(req.getPolicyType())
                 ? GroupPolicy.TYPE_BLOCK_SCHEDULED : GroupPolicy.TYPE_ALLOW_ALL;
         GroupPolicy policy = new GroupPolicy();
@@ -127,6 +137,13 @@ public class GroupPolicyResource {
 
         groupDAO.setGroupDevices(groupId,
                 req.getDeviceIds() != null ? req.getDeviceIds() : Collections.emptyList());
+
+        // Apply the just-saved state immediately (newly added packages, removed ones, a newly
+        // added device, a widened window) instead of waiting for the scheduler's next tick, which
+        // only reacts when the computed block/allow flag actually flips — an edit that doesn't
+        // flip it would otherwise sit un-applied until the schedule happens to cross a boundary
+        // again, up to a full day later. See GroupPolicyScheduler#reconcileNow.
+        scheduler.reconcileNow(groupId, previousPackages);
 
         logger.info("Group policy saved: group {} ({}), type {}", groupId, name, policyType);
         return Response.OK(toView(groupDAO.getGroupById(groupId)));

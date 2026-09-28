@@ -83,23 +83,70 @@ public class GroupPolicyScheduler {
     }
 
     void evaluateAll() {
-        LocalTime now = LocalTime.now();
         for (GroupPolicy policy : groupPolicyDAO.listAll()) {
             if (!GroupPolicy.TYPE_BLOCK_SCHEDULED.equals(policy.getPolicyType())) {
                 continue;
             }
-            LocalTime start = parseTime(policy.getStartTime());
-            LocalTime end = parseTime(policy.getEndTime());
-            if (start == null || end == null) {
+            Boolean shouldBlock = computeShouldBlock(policy);
+            if (shouldBlock == null) {
                 continue;
             }
-            boolean shouldBlock = isWithinWindow(now, start, end);
             boolean currentlyBlocked = Boolean.TRUE.equals(policy.getBlockedNow());
             if (shouldBlock == currentlyBlocked) {
                 continue; // no transition — nothing to queue
             }
             applyTransition(policy, shouldBlock);
         }
+    }
+
+    /** {@code null} if the policy has no usable time window (unparseable start/end). */
+    private Boolean computeShouldBlock(GroupPolicy policy) {
+        LocalTime start = parseTime(policy.getStartTime());
+        LocalTime end = parseTime(policy.getEndTime());
+        if (start == null || end == null) {
+            return null;
+        }
+        return isWithinWindow(LocalTime.now(), start, end);
+    }
+
+    /**
+     * Reconciles one policy's on-device state right after it's saved, instead of waiting for the
+     * next tick's transition detection — {@link #evaluateAll} only ever reacts to the computed
+     * "should block" flag actually *changing*, so an edit that doesn't flip that flag (adding a
+     * package to a group that's already inside its block window, removing one, adding a device,
+     * switching to allowAll) would otherwise sit un-applied until the schedule happens to cross a
+     * boundary again — up to a full day later. Called from {@code GroupPolicyResource} after
+     * every save, with the packages list the policy had *before* this save (so a removed package
+     * gets explicitly unblocked, since it's about to disappear from the "current" list entirely).
+     */
+    public void reconcileNow(Integer groupId, List<String> previousPackages) {
+        GroupPolicy policy = groupPolicyDAO.findByGroupId(groupId);
+        if (policy == null) {
+            return;
+        }
+        List<String> currentPackages = readPackages(policy.getPackages());
+        List<String> deviceNumbers = groupDAO.listDeviceNumbersByGroupId(groupId);
+        boolean shouldBlock = GroupPolicy.TYPE_BLOCK_SCHEDULED.equals(policy.getPolicyType())
+                && Boolean.TRUE.equals(computeShouldBlock(policy));
+
+        // Union of old + new packages, each set to its correct target state — not just "block
+        // whatever's in the current list": switching the policy type to allowAll, or narrowing the
+        // window so it no longer covers now, must also unblock packages that were blocked under the
+        // PREVIOUS save but aren't part of the "block" outcome any more.
+        java.util.LinkedHashSet<String> allKnownPackages = new java.util.LinkedHashSet<>(previousPackages);
+        allKnownPackages.addAll(currentPackages);
+        int queued = 0;
+        for (String pkg : allKnownPackages) {
+            boolean block = shouldBlock && currentPackages.contains(pkg);
+            for (String deviceNumber : deviceNumbers) {
+                queueAppBlock(deviceNumber, pkg, block);
+                queued++;
+            }
+        }
+        groupPolicyDAO.setBlockedNow(groupId, shouldBlock, System.currentTimeMillis());
+        logger.info("Group {} policy reconciled after save: blocked={}, {} command(s) queued across {} "
+                        + "package(s), {} device(s)",
+                groupId, shouldBlock, queued, allKnownPackages.size(), deviceNumbers.size());
     }
 
     /** A window is active if now falls inside [start, end); handles the common case where the
